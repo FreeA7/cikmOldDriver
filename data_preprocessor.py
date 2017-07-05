@@ -528,37 +528,92 @@ def str_stemmer_wo_parser(s, stoplist=stoplist):
     s=" ".join([word for word in s.split() if word not in stoplist])
     return " ".join([stemmer.stem(re.sub('\.(?=$)', '', word)) for word in s.split()])
 
+# 15. 用 Google dictionary修正拼写，代码见 https://www.kaggle.com/steubk/fixing-typos 以及：
+# ./Code/Chenglong/google_spelling_checker_dict.py
+# ./Code/Igor&Kostia/google_dict.py
 #
+# 16. 人工替换部分词语，单词表在：
+# ./Data/dict/word_replacer.csv
 #
+# 17. 加入外部数据？ 用处尚不清楚，见：
+# ./Data/dict/color_data.py
 #
+# 18. 同义词替换，见：
+# ./Data/dict/word_replacer.csv, line 197
 #
+# 19. 缩写替换，见：
+# ./Data/dict/word_replacer.csv, line 211
+# ./Code/Igor&Kostia/homedepot_functions.py, line 318 - 327, 361 - 367
 #
+# 20. 拼写统一，比如 mailbox 和 mail box, fibre 和 fiber 等, 见：
+# ./Code/Igor&Kostia/homedepot_functions.py, line 83 - 316
 #
+# 21. Part-of-Speech Tagging
+# 用 NLTK.pos_tagger() 函数
 #
+# 22. 材质和品牌名称的替换，19中也有涉及，将太长的品牌名称缩短，减少无效信息
+# ./Code/Igor&Kostia/homedepot_functions.py, line 318 - 327, 361 - 367
+# ./Code/Igor&Kostia/text_processing.py, line 331 - 471
 #
+# 23. 对产品名称的不同部分分别作处理，找出产品名中最重要的部分，比如应该区别对待产品名中 with, for, in, without 之后的词
+# 见：http://blog.kaggle.com/2015/07/22/crowdflower-winners-interview-3rd-place-team-quartet/
+# 论文对应原文：
+#   We noticed a structure in product title which helped us to find the most important
+#   part of the document. For example, in product title 'Husky 52 in. 10-Drawer Mobile
+#   Workbench with Solid Wood Top, Black' the product is workbench, not wood top. To
+#   deal with multiple patterns present in product title, we had to elaborate a complex
+#   algorithm, which extracted important words.
+#   We also extracted the top trigram. Igor and Kostia started this work indepen-
+#   dently, so in their notation the trigrams words are denoted as (before2thekey, before-
+#   thekey, thekey), where thekey is the last word in the trigram.
+#   We separately dealt with text after words with, for, in, without.
 #
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
+# 24. 将小写单词与大写单词分隔，把商品描述中遗漏的空格补上，类似于 lower[.?!]UPPER 这种情况
+# ./Code/Chenglong/data_processor.py, line 52 - 74
+class LowerUpperCaseSplitter(BaseReplacer):
+    """
+    homeBASICS Traditional Real Wood -> homeBASICS Traditional Real Wood
+    hidden from viewDurable rich finishLimited lifetime warrantyEncapsulated panels ->
+    hidden from view Durable rich finish limited lifetime warranty Encapsulated panels
+    Dickies quality has been built into every product.Excellent visibilityDurable ->
+    Dickies quality has been built into every product Excellent visibility Durable
+    BAD CASE:
+    shadeMature height: 36 in. - 48 in.Mature width
+    minutesCovers up to 120 sq. ft.Cleans up
+    PUT one UnitConverter before LowerUpperCaseSplitter
+    Reference:
+    https://www.kaggle.com/c/home-depot-product-search-relevance/forums/t/18472/typos-in-the-product-descriptions
+    """
+    def __init__(self):
+        self.pattern_replace_pair_list = [
+            (r"(\w)[\.?!]([A-Z])", r"\1 \2"),
+            (r"(?<=( ))([a-z]+)([A-Z]+)", r"\2 \3"),
+        ]
+
+# 25. 英文数字变成阿拉伯数字
+# ./Code/Chenglong/data_processor.py, line 151 - 168
+class NumberDigitMapper(BaseReplacer):
+    """
+    one -> 1
+    two -> 2
+    """
+    def __init__(self):
+        numbers = [
+            "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+            "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
+            "nineteen", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"
+        ]
+        digits = [
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+            16, 17, 18, 19, 20, 30, 40, 50, 60, 70, 80, 90
+        ]
+        self.pattern_replace_pair_list = [
+            (r"(?<=\W|^)%s(?=\W|$)"%n, str(d)) for n,d in zip(numbers, digits)
+        ]
+
+# 26. 作者自己编写的拼写检查
+# ./Code/Chenglong/spelling_checker.py, line 34 - 315
+# class PeterNovigSpellingChecker 和 class AutoSpellingChecker:
 #
 #
 #
