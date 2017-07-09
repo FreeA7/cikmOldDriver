@@ -83,3 +83,89 @@ def UniqueRatio_Ngram(obs, ngram, token_pattern=" "):
     obs_tokens = nlp_utils._tokenize(obs, token_pattern)
     obs_ngrams = ngram_utils._ngrams(obs_tokens, ngram)
     return np_utils._try_divide(len(set(obs_ngrams)), len(obs_ngrams))
+
+
+# 返回值是介绍中特性的个数
+def AttrCount(obs):
+    """obs is a list of attributes"""
+    return len(obs)
+
+
+# 返回值是介绍中bullet point的个数
+def AttrBulletCount(obs):
+    """obs is a list of attributes"""
+    cnt = 0
+    for lst in obs:
+        if lst[0].startswith("bullet"):
+            cnt += 1
+    return cnt
+
+
+# 返回值是介绍中bullet point占总字数的比例
+def AttrBulletRatio(obs):
+    """obs is a list of attributes"""
+    cnt = 0
+    for lst in obs:
+        if lst[0].startswith("bullet"):
+            cnt += 1
+    return np_utils._try_divide(cnt, len(obs))
+
+
+# 返回值是介绍中非bullet point的个数
+def AttrNonBulletCount(obs):
+    """obs is a list of attributes"""
+    cnt = 0
+    for lst in obs:
+        if not lst[0].startswith("bullet"):
+            cnt += 1
+    return cnt
+
+
+# 返回值是介绍中非bullet point占总字数的比例
+def AttrNonBulletRatio(obs):
+    """obs is a list of attributes"""
+    cnt = 0
+    for lst in obs:
+        if not lst[0].startswith("bullet"):
+            cnt += 1
+    return np_utils._try_divide(cnt, len(obs))
+
+
+# 返回值是介绍中是否有高度的dummy
+def AttrHasProductHeight(obs):
+    for lst in obs:
+        if lst[0].find("product height") != -1:
+            return 1
+    return 0
+
+
+# 返回值是介绍中是否有宽度的dummy
+def AttrHasProductWidth(obs):
+    for lst in obs:
+        if lst[0].find("product width") != -1:
+            return 1
+    return 0
+
+
+# 返回值是介绍中是否有长度的dummy
+def AttrHasProductLength(obs):
+    for lst in obs:
+        if lst[0].find("product length") != -1:
+            return 1
+    return 0
+
+
+# 返回值是介绍中是否有深度的dummy
+def AttrHasProductDepth(obs):
+    for lst in obs:
+        if lst[0].find("product depth") != -1:
+            return 1
+    return 0
+
+
+# 返回值是介绍中是否有户外和室内的dummy
+def AttrHasIndoorOutdoor(obs):
+    for lst in obs:
+        if lst[0].find("indoor outdoor") != -1:
+            return 1
+    return 0
