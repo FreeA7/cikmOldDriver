@@ -1,108 +1,75 @@
-# -*- coding: utf-8 -*-
-"""
-@author: Yifan Tang
-@time: 2017/7/4 11:20 AM
-"""
+import re
+import nltk
+import requests
 
-# 1. 去掉括号以及括号中的内容（已经写了）
+'''
+15 google太慢，baidu好多检查不出来，所以用bing
+17 不知道干什么所以还没加
+21 chenglong的代码里说明了可以用但是他们并没有用，我先没有加
+23 不懂，我们需要讨论一下
+'''
 
-# 2. 移除数字中的逗号，如：1,000 -> 1000
-# ./Code/Chenglong/data_processor, line 148 - 156
-class DigitCommaDigitMerger(BaseReplacer):
+# 移除数字中的逗号 - 2
+def digitcommadigitmerger(text):
     """
     1,000,000 -> 1000000
     """
+    # 设定数字匹配模式
+    digitpattern = re.compile(r'[0-9]+,[0-9]{3}')
 
-    def __init__(self):
-        self.pattern_replace_pair_list = [
-            (r"(?<=\d+),(?=000)", r""),
-        ]
+    # 需要进行两次
+    # 1,000,000,000 --> 1000,000000
+    # 1000,000000 --> 1000000000
+    for i in range(2):
+        digittext = digitpattern.findall(text)
+        if digittext:
+            for texts in digittext:
+                text = text.replace(texts, texts.replace(',',''))
+    return text
 
-# 3. 大写字母统一变小写
-# ./Code/Chenglong/data_processor, line 46 - 52
-class LowerCaseConverter(BaseReplacer):
+# 大写字母统一变小写 - 3
+def lowercaseconverter(text):
     """
     Traditional -> traditional
     """
 
-    def transform(self, text):
-        return text.lower()
+    return text.lower()
 
-# 4. 句内出现“单词小写字母结尾+下一单词大写字母开头”形式，则在大小写间加空格
-# ./Code/Chenglong/data_processor, line 55 - 78
-class LowerUpperCaseSplitter(BaseReplacer):
-    """
-    homeBASICS Traditional Real Wood -> homeBASICS Traditional Real Wood
+# “单词小写字母结尾+下一单词大写字母开头”形式，在大小写间加空格 - 4 - 24
+def loweruppercasesplitter(text):
+    text = re.sub(r"(\w)[\.?!]([A-Z])", r"\1 \2", text)
+    text = re.sub(r"([a-z]+)([A-Z]+)", r"\1 \2", text)
+    return text
 
-    hidden from viewDurable rich finishLimited lifetime warrantyEncapsulated panels ->
-    hidden from view Durable rich finish limited lifetime warranty Encapsulated panels
-
-    Dickies quality has been built into every product.Excellent visibilityDurable ->
-    Dickies quality has been built into every product Excellent visibility Durable
-
-    BAD CASE:
-    shadeMature height: 36 in. - 48 in.Mature width
-    minutesCovers up to 120 sq. ft.Cleans up
-    PUT one UnitConverter before LowerUpperCaseSplitter
-
-    Reference:
-    https://www.kaggle.com/c/home-depot-product-search-relevance/forums/t/18472/typos-in-the-product-descriptions
-    """
+# 单词替换 - 5 - 16 - 18 - 19
+class WordReplacer():
 
     def __init__(self):
-        self.pattern_replace_pair_list = [
-            (r"(\w)[\.?!]([A-Z])", r"\1 \2"),
-            (r"(?<=( ))([a-z]+)([A-Z]+)", r"\2 \3"),
-        ]
+        self.replacedict = {}
+        f = open('./data/setting/word_replacer.csv')
+        while 1:
+            line = f.readline()
+            if line:
+                if line[0] == '#':
+                    continue
+                else:
+                    self.replacedict[line[:line.find(',')]] = line[line.find(',')+1:-1]
+            else:
+                break
 
-# 5. 单词替换，replace_fname = word_replacer.csv
-# word_replacer.csv文件就在和本文同一目录之下
-# 文件中网页上的内容与文件之间的关系有待核实
-# ./Code/Chenglong/data_processor, line 83 - 97
-class WordReplacer(BaseReplacer):
+    def replace(self, text):
+        for word in self.replacedict.keys():
+            while word in text:
+                text = text.replace(word, self.replacedict[word])
+        return text
 
-    def __init__(self, replace_fname):
-        self.replace_fname = replace_fname
-        self.pattern_replace_pair_list = []
-        for line in csv.reader(open(self.replace_fname)):
-            if len(line) == 1 and line[0].startswith("#"):
-                continue
-            try:
-                pattern = r"(?<=\W|^)%s(?=\W|$)" % line[0]
-                replace = line[1]
-                self.pattern_replace_pair_list.append((pattern, replace))
-            except:
-                print(line)
-                pass
+# 将“单词/单词”以及“单词-单词”分割，但是数字的这两种形式保留 - 6
+def letterlettersplitter(text):
+    text = re.sub(r"([a-zA-Z]+)[/\-]([a-zA-Z]+)", r"\1 \2", text)
+    return text
 
-# 6. 将“单词/单词”以及“单词-单词”分割，但是数字的这两种形式保留
-# ./Code/Chenglong/data_processor, line 101 - 122
-class LetterLetterSplitter(BaseReplacer):
-    """
-    For letter and letter
-    /:
-    Cleaner/Conditioner -> Cleaner Conditioner
-
-    -:
-    Vinyl-Leather-Rubber -> Vinyl Leather Rubber
-
-    For digit and digit, we keep it as we will generate some features via math operations,
-    such as approximate height/width/area etc.
-    /:
-    3/4 -> 3/4
-
-    -:
-    1-1/4 -> 1-1/4
-    """
-
-    def __init__(self):
-        self.pattern_replace_pair_list = [
-            (r"([a-zA-Z]+)[/\-]([a-zA-Z]+)", r"\1 \2"),
-        ]
-
-# 7. 处理“字符+标点”形式
-# ./Code/Chenglong/data_processor, line 126 - 145
-class DigitLetterSplitter(BaseReplacer):
+# 处理“字符+标点”形式 - 7
+def digitlettersplitter(text):
     """
     x:
     1x1x1x1x1 -> 1 x 1 x 1 x 1 x 1
@@ -117,15 +84,10 @@ class DigitLetterSplitter(BaseReplacer):
     includes a tile flange to further simplify installation. 60 in. L x 36 in. W x 20 in.
     """
 
-    def __init__(self):
-        self.pattern_replace_pair_list = [
-            (r"(\d+)[\.\-]*([a-zA-Z]+)", r"\1 \2"),
-            (r"([a-zA-Z]+)[\.\-]*(\d+)", r"\1 \2"),
-        ]
+    text = re.sub(r"(\d+)[\.\-]*([a-zA-Z]+)", r"\1 \2", text)
+    text = re.sub(r"([a-zA-Z]+)[\.\-]*(\d+)", r"\1 \2", text)
 
-
-# 8. 将英文数字替换成阿拉伯数字
-# ./Code/Chenglong/data_processor, line 159 - 177
+# 将英文数字替换成阿拉伯数字 - 8 - 25
 class NumberDigitMapper(BaseReplacer):
     """
     one -> 1
@@ -146,8 +108,12 @@ class NumberDigitMapper(BaseReplacer):
             (r"(?<=\W|^)%s(?=\W|$)" % n, str(d)) for n, d in zip(numbers, digits)
         ]
 
-# 9. 将计量单位的表示统一
-# ./Code/Chenglong/data_processor, line 181 - 209
+    def replace(self, text):
+        for pattern in self.pattern_replace_pair_list:
+            text = re.sub(pattern[0], pattern[1], text)
+        return text
+
+# 将计量单位的表示统一 - 9
 class UnitConverter(BaseReplacer):
     """
     shadeMature height: 36 in. - 48 in.Mature width
@@ -178,34 +144,12 @@ class UnitConverter(BaseReplacer):
             (r"([0-9]+)( *)(gallons per hour|gallon per hour|gal per hour|gallons/hour|gallons/hr)\.?", r"\1 gal. per hr "),
         ]
 
-# 10. 特殊字符处理，用于完善test.py 中的 line 73 - 78
-# ./Code/Chenglong/data_processor, line 226 - 246
-class QuartetCleaner(BaseReplacer):
+    def replace(self, text):
+        for pattern in self.pattern_replace_pair_list:
+            text = re.sub(pattern[0], pattern[1], text)
+        return text
 
-    def __init__(self):
-        self.pattern_replace_pair_list = [
-            (r"<.+?>", r""),
-            # html codes
-            (r"&nbsp;", r" "),
-            (r"&amp;", r"&"),
-            (r"&#39;", r"'"),
-            (r"/>/Agt/>", r""),
-            (r"</a<gt/", r""),
-            (r"gt/>", r""),
-            (r"/>", r""),
-            (r"<br", r""),
-            # do not remove [".", "/", "-", "%"] as they are useful in numbers,
-            # e.g., 1.97, 1-1/2, 10%, etc.
-            (r"[ &<>)(_,;:!?\+^~@#\$]+", r" "),
-            ("'s\\b", r""),
-            (r"[']+", r""),
-            (r"[\"]+", r""),
-        ]
-
-# 11. Stemming以及Lemmatizing
-# ./Code/Chenglong/data_processor, line 251 - 275
-# lemmatizing for using pretrained word2vec model
-# 2nd solution in CrowdFlower
+# Stemming以及Lemmatizing - 11
 class Lemmatizer:
 
     def __init__(self):
@@ -217,8 +161,6 @@ class Lemmatizer:
             token) for token in self.Tokenizer.tokenize(text)]
         return " ".join(tokens)
 
-
-# stemming
 class Stemmer:
 
     def __init__(self, stemmer_type="snowball"):
@@ -232,9 +174,10 @@ class Stemmer:
         tokens = [self.stemmer.stem(token) for token in text.split(" ")]
         return " ".join(tokens)
 
-# 12. Igor的单词替换，和5对应
-# ./Code/Igor&Kostia/homedepot_functions, line 241 - 332
-def replace_in_parser(s):
+# Igor的单词替换 - 12 - 19 - 20 - 22
+def igor_replace_in_parser(text):
+    s = text
+
     #the first three shared on forum
     s=s.replace("acccessories","accessories")
     s = re.sub(r'\bscott\b', 'scotts', s) #brand
@@ -312,24 +255,25 @@ def replace_in_parser(s):
     s=re.sub(r'\bmail box','mailbox', s)
     
     replace_material_dict={'aluminium': 'aluminum', 
-    'medium density fiberboard': 'mdf',
-    'high density fiberboard': 'hdf',
-    'fiber reinforced polymer': 'frp',
-    'cross linked polyethylene': 'pex',
-    'poly vinyl chloride': 'pvc', 
-    'thermoplastic rubber': 'tpr', 
-    'poly lactic acid': 'pla', 
-    'acrylonitrile butadiene styrene': 'abs',
-    'chlorinated poly vinyl chloride': 'cpvc'}
+                            'medium density fiberboard': 'mdf',
+                            'high density fiberboard': 'hdf',
+                            'fiber reinforced polymer': 'frp',
+                            'cross linked polyethylene': 'pex',
+                            'poly vinyl chloride': 'pvc', 
+                            'thermoplastic rubber': 'tpr', 
+                            'poly lactic acid': 'pla', 
+                            'acrylonitrile butadiene styrene': 'abs',
+                            'chlorinated poly vinyl chloride': 'cpvc'}
     for word in replace_material_dict.keys():
-        if word in s:
+        while word in s:
             s = s.replace(word, replace_material_dict[word])
-    
-    return s
+    text = s
+    return text
 
-# 13. Igor的计量单位替换，和9对应，以及很多其他的替换
-# ./Code/Igor&Kostia/homedepot_functions, line 338 - 523
-def str_parser(s, automatic_spell_check_dict={}, remove_from_brackets=False,parse_material=False,add_space_stop_list=[]):
+# Igor的各种替换 - 13 - 19 - 20 - 22
+def igor_str_parser(text, automatic_spell_check_dict={}, remove_from_brackets=False,parse_material=False,add_space_stop_list=[]):
+    s = text
+
     #the following three replacements are shared on the forum    
     s = s.replace("craftsm,an","craftsman")        
     s = re.sub(r'depot.com/search=', '', s)
@@ -514,150 +458,179 @@ def str_parser(s, automatic_spell_check_dict={}, remove_from_brackets=False,pars
     
     s = re.sub('(?<=\ )\.(?=[0-9])', '0.', s)
     s = re.sub('(?<=^)\.(?=[0-9])', '0.', s)
+
     return " ".join([word for word in s.split()])
 
-# 14. Igor的Stemming，用的是nltk下的SnowballStemmer，和11对应
-# ./Code/Igor&Kostia/homedepot_functions, line 531 - 539
-def str_stemmer(s, automatic_spell_check_dict={},remove_from_brackets=False,parse_material=False,add_space_stop_list=[], stoplist=stoplist):
+# Igor的Stemming - 14
+def igor_str_stemmer(s, automatic_spell_check_dict={},remove_from_brackets=False,parse_material=False,add_space_stop_list=[], stoplist=stoplist):
     s=str_parser(s,automatic_spell_check_dict=automatic_spell_check_dict, remove_from_brackets=remove_from_brackets,\
             parse_material=parse_material, add_space_stop_list=add_space_stop_list)
     s=" ".join([word for word in s.split() if word not in stoplist])
     return " ".join([stemmer.stem(re.sub('\.(?=$)', '', word)) for word in s.split()])
 
-def str_stemmer_wo_parser(s, stoplist=stoplist):
+def igor_str_stemmer_wo_parser(s, stoplist=stoplist):
     s=" ".join([word for word in s.split() if word not in stoplist])
     return " ".join([stemmer.stem(re.sub('\.(?=$)', '', word)) for word in s.split()])
 
-# 15. 用 Google dictionary修正拼写，代码见 https://www.kaggle.com/steubk/fixing-typos 以及：
-# ./Code/Chenglong/google_spelling_checker_dict.py
-# ./Code/Igor&Kostia/google_dict.py
-#
-# 16. 人工替换部分词语，单词表在：
-# ./Data/dict/word_replacer.csv
-#
-# 17. 加入外部数据？ 用处尚不清楚，见：
-# ./Data/dict/color_data.py
-#
-# 18. 同义词替换，见：
-# ./Data/dict/word_replacer.csv, line 197
-#
-# 19. 缩写替换，见：
-# ./Data/dict/word_replacer.csv, line 211
-# ./Code/Igor&Kostia/homedepot_functions.py, line 318 - 327, 361 - 367
-#
-# 20. 拼写统一，比如 mailbox 和 mail box, fibre 和 fiber 等, 见：
-# ./Code/Igor&Kostia/homedepot_functions.py, line 83 - 316
-#
-# 21. Part-of-Speech Tagging
-# 用 NLTK.pos_tagger() 函数
-#
-# 22. 材质和品牌名称的替换，19中也有涉及，将太长的品牌名称缩短，减少无效信息
-# ./Code/Igor&Kostia/homedepot_functions.py, line 318 - 327, 361 - 367
-# ./Code/Igor&Kostia/text_processing.py, line 331 - 471
-#
-# 23. 对产品名称的不同部分分别作处理，找出产品名中最重要的部分，比如应该区别对待产品名中 with, for, in, without 之后的词
-# 见：http://blog.kaggle.com/2015/07/22/crowdflower-winners-interview-3rd-place-team-quartet/
-# 论文对应原文：
-#   We noticed a structure in product title which helped us to find the most important
-#   part of the document. For example, in product title 'Husky 52 in. 10-Drawer Mobile
-#   Workbench with Solid Wood Top, Black' the product is workbench, not wood top. To
-#   deal with multiple patterns present in product title, we had to elaborate a complex
-#   algorithm, which extracted important words.
-#   We also extracted the top trigram. Igor and Kostia started this work indepen-
-#   dently, so in their notation the trigrams words are denoted as (before2thekey, before-
-#   thekey, thekey), where thekey is the last word in the trigram.
-#   We separately dealt with text after words with, for, in, without.
-#
-# 24. 将小写单词与大写单词分隔，把商品描述中遗漏的空格补上，类似于 lower[.?!]UPPER 这种情况
-# ./Code/Chenglong/data_processor.py, line 52 - 74
-class LowerUpperCaseSplitter(BaseReplacer):
-    """
-    homeBASICS Traditional Real Wood -> homeBASICS Traditional Real Wood
-    hidden from viewDurable rich finishLimited lifetime warrantyEncapsulated panels ->
-    hidden from view Durable rich finish limited lifetime warranty Encapsulated panels
-    Dickies quality has been built into every product.Excellent visibilityDurable ->
-    Dickies quality has been built into every product Excellent visibility Durable
-    BAD CASE:
-    shadeMature height: 36 in. - 48 in.Mature width
-    minutesCovers up to 120 sq. ft.Cleans up
-    PUT one UnitConverter before LowerUpperCaseSplitter
-    Reference:
-    https://www.kaggle.com/c/home-depot-product-search-relevance/forums/t/18472/typos-in-the-product-descriptions
-    """
+# bing拼写检查 - 15 - 26
+def spell_check(text):
+    q = '+'.join(text.split())
+    r = requests.get('http://cn.bing.com/search?q='+q)
+    html = r.text
+    html = html[html.find('<div id="sp_requery">'):]
+    html = html[:html.find('</div>')]
+    html = re.sub(r'[<][^>]+[>]', '', html)
+    html = re.replace(' ','')
+    html = re.replace('包含', '')
+    html = re.replace('的结果。', '')
+    return html
+
+# 材质和品牌名称的替换 - 22
+class BrandReplace():
+
+### some brand names in "MFG Brand Name" of attributes.csv have a few words
+### but it is much more likely for a person to search for brand 'BEHR' 
+### than 'BEHR PREMIUM PLUS ULTRA'. That is why we replace long brand names 
+### with a shorter alternatives
     def __init__(self):
-        self.pattern_replace_pair_list = [
-            (r"(\w)[\.?!]([A-Z])", r"\1 \2"),
-            (r"(?<=( ))([a-z]+)([A-Z]+)", r"\2 \3"),
-        ]
+        self.replace_brand_dict={
+        'acurio latticeworks': 'acurio', 
+        'american kennel club':'akc',
+        'amerimax home products': 'amerimax',
+        'barclay products':'barclay',
+        'behr marquee': 'behr', 
+        'behr premium': 'behr', 
+        'behr premium deckover': 'behr', 
+        'behr premium plus': 'behr', 
+        'behr premium plus ultra': 'behr', 
+        'behr premium textured deckover': 'behr', 
+        'behr pro': 'behr', 
+        'bel air lighting': 'bel air',
+        'bootz industries':'bootz',
+        'campbell hausfeld':'campbell',
+        'columbia forest products': 'columbia',
+        'essick air products':'essick air',
+        'evergreen enterprises':'evergreen',
+        'feather river doors': 'feather river', 
+        'gardner bender':'gardner',
+        'ge parts':'ge',
+        'ge reveal':'ge',
+        'gibraltar building products':'gibraltar',
+        'gibraltar mailboxes':'gibraltar',
+        'glacier bay':'glacier',
+        'great outdoors by minka lavery': 'great outdoors', 
+        'hamilton beach': 'hamilton',
+        'hampton bay':'hampton',
+        'hampton bay quickship':'hampton',
+        'handy home products':'handy home',
+        'hickory hardware': 'hickory', 
+        'home accents holiday': 'home accents',
+        'home decorators collection': 'home decorators',
+        'homewerks worldwide':'homewerks',
+        'klein tools': 'klein',
+        'lakewood cabinets':'lakewood',
+        'leatherman tool group':'leatherman',
+        'legrand adorne':'legrand',
+        'legrand wiremold':'legrand',
+        'lg hausys hi macs':'lg',
+        'lg hausys viatera':'lg',
+        'liberty foundry':'liberty',
+        'liberty garden':'liberty',
+        'lithonia lighting':'lithonia',
+        'loloi rugs':'loloi',
+        'maasdam powr lift':'maasdam',
+        'maasdam powr pull':'maasdam',
+        'martha stewart living': 'martha stewart',
+        'merola tile': 'merola',
+        'miracle gro':'miracle',
+        'miracle sealants':'miracle',
+        'mohawk home': 'mohawk',
+        'mtd genuine factory parts':'mtd',
+        'mueller streamline': 'mueller',
+        'newport coastal': 'newport',
+        'nourison overstock':'nourison',
+        'nourison rug boutique':'nourison',
+        'owens corning': 'owens', 
+        'premier copper products':'premier',
+        'price pfister':'pfister',
+        'pride garden products':'pride garden',
+        'prime line products':'prime line',
+        'redi base':'redi',
+        'redi drain':'redi',
+        'redi flash':'redi',
+        'redi ledge':'redi',
+        'redi neo':'redi',
+        'redi niche':'redi',
+        'redi shade':'redi',
+        'redi trench':'redi',
+        'reese towpower':'reese',
+        'rheem performance': 'rheem',
+        'rheem ecosense': 'rheem',
+        'rheem performance plus': 'rheem',
+        'rheem protech': 'rheem',
+        'richelieu hardware':'richelieu',
+        'rubbermaid commercial products': 'rubbermaid', 
+        'rust oleum american accents': 'rust oleum', 
+        'rust oleum automotive': 'rust oleum', 
+        'rust oleum concrete stain': 'rust oleum', 
+        'rust oleum epoxyshield': 'rust oleum', 
+        'rust oleum flexidip': 'rust oleum', 
+        'rust oleum marine': 'rust oleum', 
+        'rust oleum neverwet': 'rust oleum', 
+        'rust oleum parks': 'rust oleum', 
+        'rust oleum professional': 'rust oleum', 
+        'rust oleum restore': 'rust oleum', 
+        'rust oleum rocksolid': 'rust oleum', 
+        'rust oleum specialty': 'rust oleum', 
+        'rust oleum stops rust': 'rust oleum', 
+        'rust oleum transformations': 'rust oleum', 
+        'rust oleum universal': 'rust oleum', 
+        'rust oleum painter touch 2': 'rust oleum',
+        'rust oleum industrial choice':'rust oleum',
+        'rust oleum okon':'rust oleum',
+        'rust oleum painter touch':'rust oleum',
+        'rust oleum painter touch 2':'rust oleum',
+        'rust oleum porch and floor':'rust oleum',
+        'salsbury industries':'salsbury',
+        'simpson strong tie': 'simpson', 
+        'speedi boot': 'speedi', 
+        'speedi collar': 'speedi', 
+        'speedi grille': 'speedi', 
+        'speedi products': 'speedi', 
+        'speedi vent': 'speedi', 
+        'pass and seymour': 'seymour',
+        'pavestone rumblestone': 'rumblestone',
+        'philips advance':'philips',
+        'philips fastener':'philips',
+        'philips ii plus':'philips',
+        'philips manufacturing company':'philips',
+        'safety first':'safety 1st',
+        'sea gull lighting': 'sea gull',
+        'scott':'scotts',
+        'scotts earthgro':'scotts',
+        'south shore furniture': 'south shore', 
+        'tafco windows': 'tafco',
+        'trafficmaster allure': 'trafficmaster', 
+        'trafficmaster allure plus': 'trafficmaster', 
+        'trafficmaster allure ultra': 'trafficmaster', 
+        'trafficmaster ceramica': 'trafficmaster', 
+        'trafficmaster interlock': 'trafficmaster', 
+        'thomas lighting': 'thomas', 
+        'unique home designs':'unique home',
+        'veranda hp':'veranda',
+        'whitehaus collection':'whitehaus',
+        'woodgrain distritubtion':'woodgrain',
+        'woodgrain millwork': 'woodgrain', 
+        'woodford manufacturing company': 'woodford', 
+        'wyndham collection':'wyndham',
+        'yardgard select': 'yardgard',
+        'yosemite home decor': 'yosemite'
+        }
 
-# 25. 英文数字变成阿拉伯数字
-# ./Code/Chenglong/data_processor.py, line 151 - 168
-class NumberDigitMapper(BaseReplacer):
-    """
-    one -> 1
-    two -> 2
-    """
-    def __init__(self):
-        numbers = [
-            "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
-            "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
-            "nineteen", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"
-        ]
-        digits = [
-            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-            16, 17, 18, 19, 20, 30, 40, 50, 60, 70, 80, 90
-        ]
-        self.pattern_replace_pair_list = [
-            (r"(?<=\W|^)%s(?=\W|$)"%n, str(d)) for n,d in zip(numbers, digits)
-        ]
-
-# 26. 作者自己编写的拼写检查
-# ./Code/Chenglong/spelling_checker.py, line 34 - 315
-# class PeterNovigSpellingChecker 和 class AutoSpellingChecker:
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-
-# 3. 在数字（左边）和字母（右边）之间加空格，如：5inch -> 5 inch
-# ./Code/Igor&Kostia/homedepot_functions, line 404
-s = re.sub('(?<=[0-9\%])(?=[a-wyz])', ' ', s)
-
-# 4. 在至少三个字母（左边）和数字（右边）之间加空格，如color5 -> color 5
-# 
+    def replace(self, text):
+        for word in self.replace_brand_dict.keys():
+            while word in text:
+                text.replace(word, self.replace_brand_dict[word])
+        return text
+    
+    
