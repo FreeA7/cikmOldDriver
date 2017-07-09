@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 @author: Fangshu Gao
-@brief: Features in ChenglongChen's paper 4.1.6 - 4.1.10
+@brief: Features in ChenglongChen's paper 4.1.6 - 4.1.11
 @time: 2017/7/9 15:35 PM
 """
+from collections import defaultdict
+import numpy as np
+
 from utils import ngram_utils, dist_utils, np_utils
 import config
 import google_spelling_checker_dict
@@ -182,8 +185,8 @@ def longest_match_ratio(obs, target):
 
 # 4.1.9.5
 # MatchAttrCount: count of attribute in product attribute list that matches search term
-def match_attr_count(obs, target, i_):
-    def _str_whole_word(self, str1, str2, i_):
+def match_attr_count(obs, target, i_=0):
+    def _str_whole_word(str1, str2, i_):
         cnt = 0
         if len(str1) > 0 and len(str2) > 0:
             try:
@@ -209,10 +212,10 @@ def match_attr_count(obs, target, i_):
 
 # 4.1.9.6
 # MatchAttrRatio: ratio of attribute in product attribute list that matches search term
-def match_attr_ratio(obs, target):
+def match_attr_ratio(obs, target, i_=0):
     lo = len(obs.split(" "))
     lt = len([t[0] for t in target if not t[0].startswith("bullet")])
-    return np_utils._try_divide(super().transform_one(obs, target, id), lo * lt)
+    return np_utils._try_divide(match_attr_count(obs, target, i_), lo * lt)
 
 
 # 4.1.9.7
@@ -236,6 +239,105 @@ def IsInGoogleDict(obs, target):
         return 1.
     else:
         return 0.
+
+
+# ------- 4.1.11 Statistical Cooccurrence TFIDF Features -------
+
+# 4.1.11.1
+# StatCoocTF Ngram: for each word ngram in obs, count how many word ngramin target that closely matches it and
+# then aggregate to obtain various statistics,e.g., max and mean. StatCooc stands for StatisticalCooccurrence
+def statcooc_tf_ngram(obs, target, n, join_string=' '):
+    obs_ngrams = ngram_utils._ngrams(obs, n, join_string)
+    target_ngrams = ngram_utils._ngrams(target, n, join_string)
+    val_list = []
+    for w1 in obs_ngrams:
+        s = 0.
+        for w2 in target_ngrams:
+            if dist_utils._is_str_match(w1, w2, config.STR_MATCH_THRESHOLD):
+                s += 1.
+        val_list.append(s)
+    if len(val_list) == 0:
+        val_list = [config.MISSING_VALUE_NUMERIC]
+    return val_list
+
+
+# 4.1.11.2
+# StatCoocTFIDF Ngram: same as StatCoocTF Ngram but weight the count with IDF of the word ngram in the obs corpus
+def statcooc_tfidf_ngram(obs, target, n, obs_corpus, target_corpus, join_string=' '):
+    # TODO: obs_corpus, target_corpus 是什么？
+    def _get_df_dict(target_corpus, n, join_string):
+        # smoothing
+        d = defaultdict(lambda: 1)
+        for target in target_corpus:
+            target_ngrams = ngram_utils._ngrams(target, n, join_string)
+            for w in set(target_ngrams):
+                d[w] += 1
+        return d
+
+    def _get_idf(obs_corpus, word):
+        N = len(obs_corpus)
+        return np.log((N - _get_df_dict(target_corpus, n, join_string)[word] + 0.5) /
+                      (_get_df_dict(target_corpus, n, join_string)[word] + 0.5))
+
+    obs_ngrams = ngram_utils._ngrams(obs, n, join_string)
+    target_ngrams = ngram_utils._ngrams(target, n, join_string)
+    val_list = []
+    for w1 in obs_ngrams:
+        s = 0.
+        for w2 in target_ngrams:
+            if dist_utils._is_str_match(w1, w2, config.STR_MATCH_THRESHOLD):
+                s += 1.
+        val_list.append(s * _get_idf(obs_corpus, w1))
+    if len(val_list) == 0:
+        val_list = [config.MISSING_VALUE_NUMERIC]
+    return val_list
+
+
+# 4.1.11.3
+# StatCoocBM25 Ngram: same as StatCoocTFIDF Ngram but with BM25 weighting
+def StatCoocBM25_Ngram(obs, target, n, obs_corpus, target_corpus, join_string=' '):
+    # TODO: obs_corpus, target_corpus 是什么？
+    def _get_df_dict(target_corpus, n, join_string):
+        # smoothing
+        d = defaultdict(lambda: 1)
+        for target in target_corpus:
+            target_ngrams = ngram_utils._ngrams(target, n, join_string)
+            for w in set(target_ngrams):
+                d[w] += 1
+        return d
+
+    def _get_idf(obs_corpus, word):
+        N = len(obs_corpus)
+        return np.log((N - _get_df_dict(target_corpus, n, join_string)[word] + 0.5) /
+                      (_get_df_dict(target_corpus, n, join_string)[word] + 0.5))
+
+    def _get_avg_ngram_doc_len():
+        lst = []
+        for target in target_corpus:
+            target_ngrams = ngram_utils._ngrams(target, n, join_string)
+            lst.append(len(target_ngrams))
+        return np.mean(lst)
+
+    k1 = config.BM25_K1  # TODO: k1, b 是什么？
+    b = config.BM25_B
+    obs_ngrams = ngram_utils._ngrams(obs, n, join_string)
+    target_ngrams = ngram_utils._ngrams(target, n, join_string)
+    K = k1 * (1 - b + b * np_utils._try_divide(len(target_ngrams), _get_avg_ngram_doc_len()))
+    val_list = []
+    for w1 in obs_ngrams:
+        s = 0.
+        for w2 in target_ngrams:
+            if dist_utils._is_str_match(w1, w2, config.STR_MATCH_THRESHOLD):
+                s += 1.
+        bm25 = s * _get_idf(obs_corpus, w1) * np_utils._try_divide(1 + k1, s + K)
+        val_list.append(bm25)
+    if len(val_list) == 0:
+        val_list = [config.MISSING_VALUE_NUMERIC]
+    return val_list
+
+# ------- 4.1.12 Vector Space Features -------
+
+
 
 
 # ------- End -------
