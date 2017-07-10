@@ -22,6 +22,8 @@ Basic Features
 """
 
 # 返回值为每一个观测值的标准形式数字编码
+
+
 def DocId(obs):
     obs_set = set(obs)
     obs_encoder = dict(zip(obs_set, range(len(obs_set))))
@@ -184,6 +186,8 @@ Distance Features
 """
 
 # 返回值是标题和描述之间的Jaccard距离
+
+
 def JaccardCoef_Ngram(obs, target, ngram, token_pattern=" "):
     ngram_str = ngram_utils._ngram_str_map[ngram]
     print("JaccardCoef_%s" % ngram_str)
@@ -276,3 +280,120 @@ def CompressionDistance_Ngram(obs, target, ngram, token_pattern=" ", aggregation
 Doc2Vec Features
 
 """
+
+# 首先把原文件中Doc2Vec_BaseEstimator类中需要使用的函数拿出来定义
+
+
+def Doc2Vec_get_vector(sent, doc2vec_model, sent_label):
+    model = doc2vec_model
+    sent_label = sent_label
+    vector_size = doc2vec_model.vector_size
+    try:
+        vect = model.docvecs[sent_label[sent]]
+    except:
+        vect = np.zeros(vector_size, dtype=float)
+    return vect
+
+
+def Doc2Vec_get_vdiff(sent1, sent2):
+    vect1 = Doc2Vec_get_vector(sent1)
+    vect2 = Doc2Vec_get_vector(sent2)
+    return dist_utils._vdiff(vect1, vect2)
+
+
+def Doc2Vec_get_cosine_sim(sent1, sent2):
+    vect1 = Doc2Vec_get_vector(sent1)
+    vect2 = Doc2Vec_get_vector(sent2)
+    return dist_utils._cosine_sim(vect1, vect2)
+
+
+def Doc2Vec_get_rmse(sent1, sent2):
+    vect1 = Doc2Vec_get_vector(sent1)
+    vect2 = Doc2Vec_get_vector(sent2)
+    return dist_utils._rmse(vect1, vect2)
+
+
+# 返回值是对文本进行doc2vec后的结果(最后提交的模型中没有用这个feature)
+def Doc2Vec_Vector(obs, doc2vec_model, model_prefix):
+    vector_size = doc2vec_model.vector_size
+    model_prefix = model_prefix
+    print("Doc2Vec_%s_D%d_Vector" % (model_prefix, vector_size))
+    return Doc2Vec_get_vector(obs)
+
+
+# 返回值是对标题和描述进行doc2vec后两个结果的差
+def Doc2Vec_Vdiff(obs, target, doc2vec_model, model_prefix):
+    vector_size = doc2vec_model.vector_size
+    model_prefix = model_prefix
+    print("Doc2Vec_%s_D%d_Vdiff" % (model_prefix, vector_size))
+    return Doc2Vec_get_vdiff(obs, target)
+
+
+# 返回值是对标题和描述进行doc2vec后两个结果的余弦差
+def Doc2Vec_CosineSim(obs, target, doc2vec_model, model_prefix):
+    vector_size = doc2vec_model.vector_size
+    model_prefix = model_prefix
+    print("Doc2Vec_%s_D%d_CosineSim" % (model_prefix, vector_size))
+    return Doc2Vec_get_cosine_sim(obs, target)
+
+
+# 返回值是对标题和描述进行doc2vec后两个结果的RMSE
+def Doc2Vec_RMSE(obs, target, doc2vec_model, model_prefix):
+    vector_size = doc2vec_model.vector_size
+    model_prefix = model_prefix
+    print("Doc2Vec_%s_D%d_RMSE" % (model_prefix, vector_size))
+    return Doc2Vec_get_rmse(obs, target)
+
+
+"""
+First and Last Ngram Features
+
+"""
+
+# 首先把原文件中Count_Ngram_BaseEstimator类中需要使用的函数拿出来定义
+
+
+def Count_Ngram_get_match_count(obs, target, idx, str_match_threshold=config.STR_MATCH_THRESHOLD):
+    str_match_threshold = str_match_threshold
+    cnt = 0
+    if (len(obs) != 0) and (len(target) != 0):
+        for word in target:
+            if dist_utils._is_str_match(word, obs[idx], str_match_threshold):
+                cnt += 1
+    return cnt
+
+
+# idx = 0
+def FirstIntersectCount_Ngram(obs, target, ngram, idx, str_match_threshold, token_pattern=" "):
+    obs_tokens = nlp_utils._tokenize(obs, token_pattern)
+    target_tokens = nlp_utils._tokenize(target, token_pattern)
+    obs_ngrams = ngram_utils._ngrams(obs_tokens, ngram)
+    target_ngrams = ngram_utils._ngrams(target_tokens, ngram)
+    return Count_Ngram_get_match_count(obs_ngrams, target_ngrams, idx)
+
+
+# idx = -1
+def LastIntersectCount_Ngram(obs, target, ngram, idx, str_match_threshold, token_pattern=" "):
+    obs_tokens = nlp_utils._tokenize(obs, token_pattern)
+    target_tokens = nlp_utils._tokenize(target, token_pattern)
+    obs_ngrams = ngram_utils._ngrams(obs_tokens, ngram)
+    target_ngrams = ngram_utils._ngrams(target_tokens, ngram)
+    return Count_Ngram_get_match_count(obs_ngrams, target_ngrams, idx)
+
+
+# idx = 0
+def FirstIntersectRatio_Ngram(obs, target, ngram, idx, str_match_threshold, token_pattern=" "):
+    obs_tokens = nlp_utils._tokenize(obs, token_pattern)
+    target_tokens = nlp_utils._tokenize(target, token_pattern)
+    obs_ngrams = ngram_utils._ngrams(obs_tokens, ngram)
+    target_ngrams = ngram_utils._ngrams(target_tokens, ngram)
+    return np_utils._try_divide(Count_Ngram_get_match_count(obs_ngrams, target_ngrams, idx), len(target_ngrams))
+
+
+# idx = -1
+def LastIntersectRatio_Ngram(obs, target, ngram, idx, str_match_threshold, token_pattern=" "):
+    obs_tokens = nlp_utils._tokenize(obs, token_pattern)
+    target_tokens = nlp_utils._tokenize(target, token_pattern)
+    obs_ngrams = ngram_utils._ngrams(obs_tokens, ngram)
+    target_ngrams = ngram_utils._ngrams(target_tokens, ngram)
+    return np_utils._try_divide(Count_Ngram_get_match_count(obs_ngrams, target_ngrams, idx), len(target_ngrams))
