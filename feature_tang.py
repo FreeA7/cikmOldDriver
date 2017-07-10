@@ -7,12 +7,19 @@
 """
 import numpy as np
 import re
+import config
+import string
 
 from collections import Counter
-from utils import ngram_utils, nlp_utils, np_utils
-from utils import time_utils, logging_utils, pkl_utils
+from utils import ngram_utils, nlp_utils, np_utils, dist_utils
+# from utils import time_utils, logging_utils, pkl_utils
 from sklearn.preprocessing import LabelBinarizer
 
+
+"""
+Basic Features
+
+"""
 
 # 返回值为每一个观测值的标准形式数字编码
 def DocId(obs):
@@ -169,3 +176,103 @@ def AttrHasIndoorOutdoor(obs):
         if lst[0].find("indoor outdoor") != -1:
             return 1
     return 0
+
+
+"""
+Distance Features
+
+"""
+
+# 返回值是标题和描述之间的Jaccard距离
+def JaccardCoef_Ngram(obs, target, ngram, token_pattern=" "):
+    ngram_str = ngram_utils._ngram_str_map[ngram]
+    print("JaccardCoef_%s" % ngram_str)
+    obs_tokens = nlp_utils._tokenize(obs, token_pattern)
+    target_tokens = nlp_utils._tokenize(target, token_pattern)
+    obs_ngrams = ngram_utils._ngrams(obs_tokens, ngram)
+    target_ngrams = ngram_utils._ngrams(target_tokens, ngram)
+    return dist_utils._jaccard_coef(obs_ngrams, target_ngrams)
+
+
+# 返回值是标题和描述之间的Dice距离
+def DiceDistance_Ngram(obs, target, ngram, token_pattern=" "):
+    ngram_str = ngram_utils._ngram_str_map[ngram]
+    print("JaccardCoef_%s" % ngram_str)
+    obs_tokens = nlp_utils._tokenize(obs, token_pattern)
+    target_tokens = nlp_utils._tokenize(target, token_pattern)
+    obs_ngrams = ngram_utils._ngrams(obs_tokens, ngram)
+    target_ngrams = ngram_utils._ngrams(target_tokens, ngram)
+    return dist_utils._dice_coef(obs_ngrams, target_ngrams)
+
+
+# 返回值是标题和描述之间的edit距离(整体文档层面)
+def EditDistance(obs, target):
+    return dist_utils._edit_dist(obs, target)
+
+
+# 返回值是标题和描述之间的edit距离(ngram层面)
+def EditDistance_Ngram(obs, target, ngram, token_pattern=" ", aggregation_mode_prev="", aggregation_mode=""):
+    ngram_str = ngram_utils._ngram_str_map[ngram]
+    feat_name = []
+    for m1 in aggregation_mode_prev:
+        for m in aggregation_mode:
+            n = "EditDistance_%s_%s_%s" % (
+                ngram_str, string.capwords(m1), string.capwords(m))
+            feat_name.append(n)
+    print(feat_name)
+
+    obs_tokens = nlp_utils._tokenize(obs, token_pattern)
+    target_tokens = nlp_utils._tokenize(target, token_pattern)
+    obs_ngrams = ngram_utils._ngrams(obs_tokens, ngram)
+    target_ngrams = ngram_utils._ngrams(target_tokens, ngram)
+    val_list = []
+    for w1 in obs_ngrams:
+        _val_list = []
+        for w2 in target_ngrams:
+            s = dist_utils._edit_dist(w1, w2)
+            _val_list.append(s)
+        if len(_val_list) == 0:
+            _val_list = [config.MISSING_VALUE_NUMERIC]
+        val_list.append(_val_list)
+    if len(val_list) == 0:
+        val_list = [[config.MISSING_VALUE_NUMERIC]]
+    return val_list
+
+
+# 返回值是标题和描述之间的compression距离(整体文档层面)
+def CompressionDistance(obs, target):
+    return dist_utils._compression_dist(obs, target)
+
+
+# 返回值是标题和描述之间的compression距离(ngram层面)
+def CompressionDistance_Ngram(obs, target, ngram, token_pattern=" ", aggregation_mode_prev="", aggregation_mode=""):
+    ngram_str = ngram_utils._ngram_str_map[ngram]
+    feat_name = []
+    for m1 in aggregation_mode_prev:
+        for m in aggregation_mode:
+            n = "CompressionDistance_%s_%s_%s" % (
+                ngram_str, string.capwords(m1), string.capwords(m))
+            feat_name.append(n)
+    print(feat_name)
+    obs_tokens = nlp_utils._tokenize(obs, token_pattern)
+    target_tokens = nlp_utils._tokenize(target, token_pattern)
+    obs_ngrams = ngram_utils._ngrams(obs_tokens, ngram)
+    target_ngrams = ngram_utils._ngrams(target_tokens, ngram)
+    val_list = []
+    for w1 in obs_ngrams:
+        _val_list = []
+        for w2 in target_ngrams:
+            s = dist_utils._compression_dist(w1, w2)
+            _val_list.append(s)
+        if len(_val_list) == 0:
+            _val_list = [config.MISSING_VALUE_NUMERIC]
+        val_list.append(_val_list)
+    if len(val_list) == 0:
+        val_list = [[config.MISSING_VALUE_NUMERIC]]
+    return val_list
+
+
+"""
+Doc2Vec Features
+
+"""
