@@ -23,6 +23,8 @@ from sklearn.manifold import TSNE
 from utils import ngram_utils, nlp_utils, np_utils, dist_utils
 # from utils import time_utils, logging_utils, pkl_utils
 
+from nltk.corpus import wordnet as wn
+
 """
 1. Basic Features
 
@@ -288,6 +290,7 @@ def CompressionDistance_Ngram(obs, target, ngram, token_pattern=" ", aggregation
 
 """
 
+# Doc2Vec是用embedding_trainer.py训练的
 # 首先把原文件中Doc2Vec_BaseEstimator类中需要使用的函数拿出来定义
 
 
@@ -688,3 +691,184 @@ def CharDistribution_KL(obs_corpus, target_corpus):
     # KL
     kl = dist_utils._KL(X_obs, X_target)
     return kl
+
+
+"""
+13. Word2Vec Features
+
+"""
+
+# Word2Vec是用embedding_trainer.py训练的
+# 首先把原文件中Word2Vec类中需要使用的函数拿出来定义
+
+
+def Word2Vec_get_valid_word_list(text, word2vec_model):
+    model = word2vec_model
+    return [w for w in text.lower().split(" ") if w in model]
+
+
+def Word2Vec_get_importance(text1, text2):
+    len_prev_1 = len(text1.split(" "))
+    len_prev_2 = len(text2.split(" "))
+    len1 = len(Word2Vec_get_valid_word_list(text1))
+    len2 = len(Word2Vec_get_valid_word_list(text2))
+    imp = np_utils._try_divide(len1 + len2, len_prev_1 + len_prev_2)
+    return imp
+
+
+def Word2Vec_get_n_similarity(text1, text2, word2vec_model):
+    model = word2vec_model
+    lst1 = Word2Vec_get_valid_word_list(text1)
+    lst2 = Word2Vec_get_valid_word_list(text2)
+    if len(lst1) > 0 and len(lst2) > 0:
+        return model.n_similarity(lst1, lst2)
+    else:
+        return config.MISSING_VALUE_NUMERIC
+
+
+def Word2Vec_get_n_similarity_imp(text1, text2):
+    sim = Word2Vec_get_n_similarity(text1, text2)
+    imp = Word2Vec_get_importance(text1, text2)
+    return sim * imp
+
+
+def Word2Vec_get_centroid_vector(text, word2vec_model):
+    model = word2vec_model
+    vector_size = word2vec_model.vector_size
+    lst = Word2Vec_get_valid_word_list(text)
+    centroid = np.zeros(vector_size)
+    for w in lst:
+        centroid += model[w]
+    if len(lst) > 0:
+        centroid /= float(len(lst))
+    return centroid
+
+
+def Word2Vec_get_centroid_vdiff(text1, text2):
+    centroid1 = Word2Vec_get_centroid_vector(text1)
+    centroid2 = Word2Vec_get_centroid_vector(text2)
+    return dist_utils._vdiff(centroid1, centroid2)
+
+
+def Word2Vec_get_centroid_rmse(text1, text2):
+    centroid1 = Word2Vec_get_centroid_vector(text1)
+    centroid2 = Word2Vec_get_centroid_vector(text2)
+    return dist_utils._rmse(centroid1, centroid2)
+
+
+def Word2Vec_get_centroid_rmse_imp(text1, text2):
+    rmse = Word2Vec_get_centroid_rmse(text1, text2)
+    imp = Word2Vec_get_importance(text1, text2)
+    return rmse * imp
+
+
+def Word2Vec_Centroid_Vector(obs):
+    return Word2Vec_get_centroid_vector(obs)
+
+
+def Word2Vec_Importance(obs, target):
+    return Word2Vec_get_importance(obs, target)
+
+
+# 返回值是Word2Vec后标题和描述之间的n阶相似度
+def Word2Vec_N_Similarity(obs, target):
+    return Word2Vec_get_n_similarity(obs, target)
+
+
+# 返回值是Word2Vec后标题centroid vector和描述centroid vector之间的RMSE
+def Word2Vec_Centroid_RMSE(obs, target):
+    return Word2Vec_get_centroid_rmse(obs, target)
+
+
+# 原文有一个很长的说明，没看明白
+def Word2Vec_CosineSim(obs, target, word2vec_model, token_pattern=" "):
+    model = word2vec_model
+    val_list = []
+    obs_tokens = nlp_utils._tokenize(obs, token_pattern)
+    target_tokens = nlp_utils._tokenize(target, token_pattern)
+    for obs_token in obs_tokens:
+        _val_list = []
+        if obs_token in model:
+            for target_token in target_tokens:
+                if target_token in model:
+                    sim = dist_utils._cosine_sim(
+                        model[obs_token], model[target_token])
+                    _val_list.append(sim)
+        if len(_val_list) == 0:
+            _val_list = [config.MISSING_VALUE_NUMERIC]
+        val_list.append(_val_list)
+    if len(val_list) == 0:
+        val_list = [[config.MISSING_VALUE_NUMERIC]]
+    return val_list
+
+
+"""
+14. WordNet Similarity Features
+
+"""
+
+# 首先把原文件中WordNet_Similarity类中需要使用的函数拿出来定义
+
+
+def WordNet_Similarity_maximum_similarity_for_two_synset_list(syn_list1, syn_list2, metric="path"):
+    metric = metric
+    if metric == "path":
+        metric_func = lambda syn1, syn2: wn.path_similarity(syn1, syn2)
+    elif metric == "lch":
+        metric_func = lambda syn1, syn2: wn.lch_similarity(syn1, syn2)
+    elif metric == "wup":
+        metric_func = lambda syn1, syn2: wn.wup_similarity(syn1, syn2)
+    else:
+        raise(ValueError(
+            "Wrong similarity metric: %s, should be one of path/lch/wup." % metric))
+    s = 0.
+    if syn_list1 and syn_list2:
+        for syn1 in syn_list1:
+            for syn2 in syn_list2:
+                try:
+                    _s = metric_func(syn1, syn2)
+                except:
+                    _s = config.MISSING_VALUE_NUMERIC
+                if _s and _s > s:
+                    s = _s
+    return s
+
+
+# {Path:metric="path", Lch:metric="lch", Wup:metric="wup" }
+# 同上，没仔细看注释
+def WordNet_Similarity(obs, target, token_pattern=" ", metric="path", aggregation_mode_prev="", aggregation_mode=""):
+    metric = metric
+    feat_name = []
+    for m1 in aggregation_mode_prev:
+        for m in aggregation_mode:
+            n = "WordNet_%s_Similarity_%s_%s" % (
+                string.capwords(metric), string.capwords(m1), string.capwords(m))
+            feat_name.append(n)
+    print(feat_name)
+
+    obs_tokens = nlp_utils._tokenize(obs, token_pattern)
+    target_tokens = nlp_utils._tokenize(target, token_pattern)
+    obs_synset_list = [wn.synsets(obs_token) for obs_token in obs_tokens]
+    target_synset_list = [wn.synsets(target_token)
+                          for target_token in target_tokens]
+    val_list = []
+    for obs_synset in obs_synset_list:
+        _val_list = []
+        for target_synset in target_synset_list:
+            _s = WordNet_Similarity_maximum_similarity_for_two_synset_list(
+                obs_synset, target_synset, metric)
+            _val_list.append(_s)
+        if len(_val_list) == 0:
+            _val_list = [config.MISSING_VALUE_NUMERIC]
+        val_list.append(_val_list)
+    if len(val_list) == 0:
+        val_list = [[config.MISSING_VALUE_NUMERIC]]
+    return val_list
+
+
+"""
+15. Feature Correlation with Target
+
+"""
+
+# 直接调用plot_feature_corr.py即可
