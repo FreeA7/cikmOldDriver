@@ -201,4 +201,13 @@ df[5][df[5] == "2-in-1s"] = df[4][df[5] == "2-in-1s"]
 df[5][df[5] == "All-In-One"] = df[4][df[5] == "All-In-One"]
 
 
+# 0 - 92
+df[5][df[5] == "Traditional Laptops"] = df[4][df[5] == "Traditional Laptops"]
+df[5][df[5] == "Women"] = df[4][df[5] == "Women"]
+df[5][df[5] == "Men"] = df[4][df[5] == "Men"]
+df[5][df[5] == "Women - Eau De Parfume"] = 'Eau De Parfume'
+df[5][df[5] == "NaN"] = df[4][df[5] == "NaN"]
+df[5][df[5] == "Sets"] = df[4][df[5] == "Sets"]
+df[5][df[5] == "Face"] = df[4][df[5] == "Face"]
+df[5][df[5] == "All-purpose"] = df[4][df[5] == "All-purpose"]
 
