@@ -84,109 +84,110 @@ def judgeattr(attrlist, html):
 
 # 解析短描述文本，将一段话分割为多句短描述并存放在一个list中
 def parserdes(q_info, q_error, data, alphabet, number, attrpattern, attrlist):
-    try:
-        for idx in data.index:
+    #try:
+    for idx in data.index:
 
-            # 获取一段话准备切割
-            html = getshortdescription(data, idx)
+        # 获取一段话准备切割
+        html = getshortdescription(data, idx)
 
-            # 短描述为空
-            if html in ['……', '…', 'nan', '.']:
-                descs = []
+        # 短描述为空
+        if html in ['……', '…', 'nan', '.']:
+            descs = []
 
-            # 使用ul/ol标签以及li标签格式
-            elif '</ul>' in html or '</ol>' in html or '</li>' in html:
-                html = etree.HTML(html)
-                descs = html.xpath('//li')
-                descs = [desc.text for desc in descs]
+        # 使用ul/ol标签以及li标签格式
+        elif '</ul>' in html or '</ol>' in html or '</li>' in html:
+            html = etree.HTML(html)
+            descs = html.xpath('//li')
+            descs = [desc.text for desc in descs]
 
-            # 使用tr标签以及td标签格式
-            elif '</tr>' in html:
-                html = etree.HTML(html)
-                descs = html.xpath('//td')
-                descs = [desc.text for desc in descs]
+        # 使用tr标签以及td标签格式
+        elif '</tr>' in html:
+            html = etree.HTML(html)
+            descs = html.xpath('//td')
+            descs = [desc.text for desc in descs]
 
-            # 使用br标签分隔
-            elif '<br' in html:
-                descs = re.split('<br[^>]*>', html)
-                descs = clearlistnull(descs)
+        # 使用br标签分隔
+        elif '<br' in html:
+            descs = re.split('<br[^>]*>', html)
+            descs = clearlistnull(descs)
 
-            # 使用p标签
-            elif '<p' in html:
-                temp_pattern = re.compile('<p[^>]*>[^<]*</p')
-                descs = temp_pattern.findall(html)
-                descs = [desc[desc.find('>') + 1:-3] for desc in descs]
-                descs = clearlistnull(descs)
+        # 使用p标签
+        elif '<p' in html:
+            temp_pattern = re.compile('<p[^>]*>[^<]*</p')
+            descs = temp_pattern.findall(html)
+            descs = [desc[desc.find('>') + 1:-3] for desc in descs]
+            descs = clearlistnull(descs)
 
-            # 使用h2标签
-            elif '<h2' in html:
-                temp_pattern = re.compile('<h2[^>]*>[^<]*</h2')
-                descs = temp_pattern.findall(html)
-                descs = [desc[desc.find('>') + 1:-4] for desc in descs]
-                descs = clearlistnull(descs)
+        # 使用h2标签
+        elif '<h2' in html:
+            temp_pattern = re.compile('<h2[^>]*>[^<]*</h2')
+            descs = temp_pattern.findall(html)
+            descs = [desc[desc.find('>') + 1:-4] for desc in descs]
+            descs = clearlistnull(descs)
 
-            # 使用b标签
-            elif '<b' in html:
-                temp_pattern = re.compile('<b[^>]*>[^<]*</b')
-                descs = temp_pattern.findall(html)
-                descs = [desc[desc.find('>') + 1:-3] for desc in descs]
-                descs = clearlistnull(descs)
+        # 使用b标签
+        elif '<b' in html:
+            temp_pattern = re.compile('<b[^>]*>[^<]*</b')
+            descs = temp_pattern.findall(html)
+            descs = [desc[desc.find('>') + 1:-3] for desc in descs]
+            descs = clearlistnull(descs)
 
-            # 使用div标签
-            elif '<div' in html:
-                temp_pattern = re.compile('<div[^>]*>[^<]*</div')
-                descs = temp_pattern.findall(html)
-                descs = [desc[desc.find('>') + 1:-5] for desc in descs]
-                descs = clearlistnull(descs)
+        # 使用div标签
+        elif '<div' in html:
+            temp_pattern = re.compile('<div[^>]*>[^<]*</div')
+            descs = temp_pattern.findall(html)
+            descs = [desc[desc.find('>') + 1:-5] for desc in descs]
+            descs = clearlistnull(descs)
 
-            # 使用/分隔，但注意这种情况说明一定没有html标签，所以/一定不是</中的/
-            elif '/' in html and '</' not in html:
-                descs = html.split('/')
-                descs = clearlistnull(descs)
+        # 使用/分隔，但注意这种情况说明一定没有html标签，所以/一定不是</中的/
+        elif '/' in html and '</' not in html:
+            descs = html.split('/')
+            descs = clearlistnull(descs)
 
-            # 不同短描述是不同的属性，以属性+：的形式开头
-            elif judgeattr(attrlist, html):
-                descs = re.split(attrpattern, html)
-                descs = clearlistnull(descs)
-                if len(descs) % 2 == 1:
-                    descs = descs[1:]
-                descs = recombinelist(descs)
+        # 不同短描述是不同的属性，以属性+：的形式开头
+        elif judgeattr(attrlist, html):
+            descs = re.split(attrpattern, html)
+            descs = clearlistnull(descs)
+            if len(descs) % 2 == 1:
+                descs = descs[1:]
+            descs = recombinelist(descs)
 
-            # 使用1,2,的形式分隔
-            elif '1,' in html and '2,' in html and '3,' in html:
-                descs = re.split('[0-9]+,', html)
-                descs = clearlistnull(descs)
+        # 使用1,2,的形式分隔
+        elif '1,' in html and '2,' in html and '3,' in html:
+            descs = re.split('[0-9]+,', html)
+            descs = clearlistnull(descs)
 
-            # 以上分割形式都没能处理
-            else:
-                descs = []
+        # 以上分割形式都没能处理
+        else:
+            descs = []
 
-                # bigSmall这种形式，Small就是另一个短描述的开头
-                for word in html[1:]:
-                    if word in alphabet and html[html.find(word) - 1] not in alphabet + ' -()' + number:
-                        descs.append(html[:html.find(word)])
-                        html = html[html.find(word):]
-                descs.append(html)
+            # bigSmall这种形式，Small就是另一个短描述的开头
+            for word in html[1:]:
+                if word in alphabet and html[html.find(word) - 1] not in alphabet + ' -()' + number:
+                    descs.append(html[:html.find(word)])
+                    html = html[html.find(word):]
+            descs.append(html)
 
-                # 依然没有被分开的话使用•;.进行最后的分隔处理
-                if len(descs) == 1:
-                    descs = descs[0].split('•')
-                if len(descs) == 1:
-                    descs = descs[0].split(';')
-                if len(descs) == 1:
-                    descs = descs[0].split('.')
-                descs = clearlistnull(descs)
+            # 依然没有被分开的话使用•;.进行最后的分隔处理
+            if len(descs) == 1:
+                descs = descs[0].split('•')
+            if len(descs) == 1:
+                descs = descs[0].split(';')
+            if len(descs) == 1:
+                descs = descs[0].split('.')
+            descs = clearlistnull(descs)
 
-            # 将短描述的list通过一个quene传回主程序
-            id = [str(idx)]
-            id.extend(descs)
-            q_info.put(id)
-            #result = np.array([idx, descs])
-            #q_info.put(result)
+        # 将短描述的list通过一个quene传回主程序
+        sku_id = [data['sku_id'][idx]]
+        #print(sku_id)
+        sku_id.extend(descs)
+        q_info.put(sku_id)
+        #result = np.array([idx, descs])
+        #q_info.put(result)
 
     # 如果处理的过程报错，则将错误信息通过quene传回打印
-    except Exception as err:
-        q_error.put(err)
+    #except Exception as err:
+    #    q_error.put(err)
 
 # 主函数
 if __name__ == '__main__':
@@ -241,11 +242,15 @@ if __name__ == '__main__':
     data_list = []
     workers = 8
 
+    data0 = data
+
+    print('总表大小： '+str(data.__len__()))
     # 创建进程进行多进程处理
     for i in range(workers):
         data_list.append(data.sample(frac=(1 / (workers - i))))
-        data.drop(data_list[-1].index)
-        print('添加第' + str(i) + '个进程 : ' + str(datetime.datetime.now()))
+        data=data.drop(data_list[-1].index)
+        print('删除后总表大小： ' + str(data.__len__()))
+        print('添加第' + str(i) + '个进程 : ' + str(datetime.datetime.now()) + ' 分到 ' + str(len(data_list[-1])) + ' 行数据')
         pool.apply_async(parserdes, args=(q_info, q_error, data_list[i], alphabet, number, attrpattern, attrlist))
         print('第' + str(i) + '个进程添加完毕 : ' + str(datetime.datetime.now()))
     pool.close()
@@ -253,6 +258,9 @@ if __name__ == '__main__':
     # results = np.empty([1, 2])
 
     # 输出处理之后的结果
+    list_id = []
+    list_description = []
+
     count = 0
     while not q_info.empty():
         count += 1
@@ -261,11 +269,16 @@ if __name__ == '__main__':
         #results = np.concatenate((results, np.array(get_one_row)), axis=0)
         # print("added" + str(count))
         # print(get_one_row)
-        fw = open('output.txt', 'a+', encoding='utf-8')
-        for elements in get_one_row:
-            if elements:
-                fw.write(elements+'\t')
-        fw.write('\n')
+
+        #fw = open('output.txt', 'a+', encoding='utf-8')
+        #for elements in get_one_row:
+        #    if elements:
+        #        fw.write(elements+'\t')
+        #fw.write('\n')
+
+        list_id.append(get_one_row[0])
+        list_description.append(get_one_row[1:])
+
         if not q_error.empty():
             print(q_error.get(True))
             # pass
@@ -275,3 +288,6 @@ if __name__ == '__main__':
             # pass
 
     print('数据处理完成，共 %d 条' % count)
+
+    description = pd.DataFrame({'sku_id': list_id, 'description': list_description}).drop_duplicates('sku_id')
+    merged_data = data0.merge(description, left_on = 'sku_id', right_on='sku_id', how='left')
