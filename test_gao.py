@@ -1,8 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-@author: Shenghao Chen
-@time: 2017/7/5 10:59 AM
-"""
 
 import pandas as pd
 import numpy as np
@@ -182,7 +178,7 @@ def parserdes(q_info, q_error, data, alphabet, number, attrpattern, attrlist):
                 descs = clearlistnull(descs)
 
             # 将短描述的list通过一个quene传回主程序
-            q_info.put(descs)
+            q_info.put(np.array([idx, descs]))
 
     # 如果处理的过程报错，则将错误信息通过quene传回打印
     except Exception as err:
@@ -240,7 +236,7 @@ if __name__ == '__main__':
 
     # 将数据分为workers份
     data_list = []
-    workers = 8
+    workers = 2
 
     # 创建进程进行多进程处理
     for i in range(workers):
@@ -251,13 +247,19 @@ if __name__ == '__main__':
         print('第' + str(i) + '个进程添加完毕 : ' + str(datetime.datetime.now()))
     pool.close()
 
+    results = np.empty([1, 2])
+
     # 输出处理之后的结果
     count = 0
     while 1:
         count += 1
-        print(q_info.get(True))
+        get_one_row = q_info.get(True)
+        results = np.concatenate((results, np.array(get_one_row)), axis=0)
+        print("added" + str(count))
         if not q_error.empty():
             print(q_error.get(True))
-        if count % 100 == 0:
-            print(str(count // 100) + 'h')
-
+            # pass
+        if count % 1000 == 0:
+            print(str(count // 1000) + 'k')
+            print(str(len(data_list)))
+            # pass
