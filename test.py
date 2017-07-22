@@ -11,6 +11,7 @@ from lxml import etree
 import multiprocessing
 import datetime
 
+
 # 从数据中获取标签行并返回为array
 def getlabels(path):
     f = open(path)
@@ -18,10 +19,11 @@ def getlabels(path):
     while 1:
         line = f.readline()
         if line:
-            label.append(int(re.sub('[^0-1]','',line)))
+            label.append(int(re.sub('[^0-1]', '', line)))
         else:
             break
     return np.asarray(label)
+
 
 # 去除列表中的所有空值
 def clearlistnull(list_arg):
@@ -32,6 +34,7 @@ def clearlistnull(list_arg):
             break
     return list_arg
 
+
 # 重新组合被由属性名切开的列表，例如：
 # 'Color:yellow Type:xxl Material:gold'
 # --按照属性名切分--> ['Color:','yellow','Type:','xxl','Material:','gold']
@@ -39,12 +42,13 @@ def clearlistnull(list_arg):
 def recombinelist(list_arg):
     list_output = []
     for i in range(len(list_arg)):
-        if i%2 == 1:
-            list_output.append(list_arg[i-1] + list_arg[i])
+        if i % 2 == 1:
+            list_output.append(list_arg[i - 1] + list_arg[i])
     return list_output
 
+
 # 获取一行的短文本描述并做基础处理
-def getshortdescription(data,i):
+def getshortdescription(data, i):
     html = str(data.get_value(i, 'short_description'))
 
     # 可能出现错误编码，对文本进行重编码
@@ -57,7 +61,7 @@ def getshortdescription(data,i):
     replaceword = replacepattern.findall(html)
     if replaceword:
         for word in replaceword:
-            html = html.replace(word, word.replace('/',' '))
+            html = html.replace(word, word.replace('/', ' '))
 
     # html中特殊字符的替换
     html = html.replace(' :', ':')
@@ -69,9 +73,10 @@ def getshortdescription(data,i):
     html = re.sub(r"&#39;", "'", html)
 
     # 去除括号以及括号中的所有内容
-    html = re.sub(r'[(][^)]+[)]','',html)
+    html = re.sub(r'[(][^)]+[)]', '', html)
 
     return html
+
 
 # 判断短描述
 def judgeattr(attrlist, html):
@@ -79,6 +84,7 @@ def judgeattr(attrlist, html):
         if attr in html:
             return 1
     return 0
+
 
 # 解析短描述文本，将一段话分割为多句短描述并存放在一个list中
 def parserdes(q_info, q_error, data, alphabet, number, attrpattern, attrlist):
@@ -89,7 +95,7 @@ def parserdes(q_info, q_error, data, alphabet, number, attrpattern, attrlist):
             html = getshortdescription(data, idx)
 
             # 短描述为空
-            if html in ['……','…','nan','.']:
+            if html in ['……', '…', 'nan', '.']:
                 descs = []
 
             # 使用ul/ol标签以及li标签格式
@@ -106,35 +112,35 @@ def parserdes(q_info, q_error, data, alphabet, number, attrpattern, attrlist):
 
             # 使用br标签分隔
             elif '<br' in html:
-                descs = re.split('<br[^>]*>',html)
+                descs = re.split('<br[^>]*>', html)
                 descs = clearlistnull(descs)
 
             # 使用p标签
             elif '<p' in html:
                 temp_pattern = re.compile('<p[^>]*>[^<]*</p')
                 descs = temp_pattern.findall(html)
-                descs = [desc[desc.find('>')+1:-3] for desc in descs]
+                descs = [desc[desc.find('>') + 1:-3] for desc in descs]
                 descs = clearlistnull(descs)
 
             # 使用h2标签
             elif '<h2' in html:
                 temp_pattern = re.compile('<h2[^>]*>[^<]*</h2')
                 descs = temp_pattern.findall(html)
-                descs = [desc[desc.find('>')+1:-4] for desc in descs]
+                descs = [desc[desc.find('>') + 1:-4] for desc in descs]
                 descs = clearlistnull(descs)
 
             # 使用b标签
             elif '<b' in html:
                 temp_pattern = re.compile('<b[^>]*>[^<]*</b')
                 descs = temp_pattern.findall(html)
-                descs = [desc[desc.find('>')+1:-3] for desc in descs]
+                descs = [desc[desc.find('>') + 1:-3] for desc in descs]
                 descs = clearlistnull(descs)
 
             # 使用div标签
             elif '<div' in html:
                 temp_pattern = re.compile('<div[^>]*>[^<]*</div')
                 descs = temp_pattern.findall(html)
-                descs = [desc[desc.find('>')+1:-5] for desc in descs]
+                descs = [desc[desc.find('>') + 1:-5] for desc in descs]
                 descs = clearlistnull(descs)
 
             # 使用/分隔，但注意这种情况说明一定没有html标签，所以/一定不是</中的/
@@ -146,13 +152,13 @@ def parserdes(q_info, q_error, data, alphabet, number, attrpattern, attrlist):
             elif judgeattr(attrlist, html):
                 descs = re.split(attrpattern, html)
                 descs = clearlistnull(descs)
-                if len(descs)%2 == 1:
+                if len(descs) % 2 == 1:
                     descs = descs[1:]
                 descs = recombinelist(descs)
 
             # 使用1,2,的形式分隔
             elif '1,' in html and '2,' in html and '3,' in html:
-                descs = re.split('[0-9]+,',html)
+                descs = re.split('[0-9]+,', html)
                 descs = clearlistnull(descs)
 
             # 以上分割形式都没能处理
@@ -161,7 +167,7 @@ def parserdes(q_info, q_error, data, alphabet, number, attrpattern, attrlist):
 
                 # bigSmall这种形式，Small就是另一个短描述的开头
                 for word in html[1:]:
-                    if word in alphabet and html[html.find(word)-1] not in alphabet+' -()'+number:
+                    if word in alphabet and html[html.find(word) - 1] not in alphabet + ' -()' + number:
                         descs.append(html[:html.find(word)])
                         html = html[html.find(word):]
                 descs.append(html)
@@ -181,7 +187,6 @@ def parserdes(q_info, q_error, data, alphabet, number, attrpattern, attrlist):
     # 如果处理的过程报错，则将错误信息通过quene传回打印
     except Exception as err:
         q_error.put(err)
-
 
 
 # 主函数
@@ -217,17 +222,17 @@ if __name__ == '__main__':
     # 由于属性名在文本中可能首字母大写也可能不大写，因此都考虑进来
     attrlistlower = [j.lower() for j in attrlist]
     attrlist += attrlistlower
-    attrpattern = '('+'|'.join(attrlist)+')'
+    attrpattern = '(' + '|'.join(attrlist) + ')'
 
     # 定义大写字母字母表以及数字
     alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     number = '0123456789'
 
     # 打开训练文件并获取两个labels并与数据结合
-    data = pd.read_csv('./data/training/data_train.csv',encoding = 'utf-8',
-                       names = ['country', 'sku_id', 'title', 'category_lvl_1',
-                                'category_lvl_2', 'category_lvl_3',
-                                'short_description', 'price', 'product_type'])
+    data = pd.read_csv('./data/training/data_train.csv', encoding='utf-8',
+                       names=['country', 'sku_id', 'title', 'category_lvl_1',
+                              'category_lvl_2', 'category_lvl_3',
+                              'short_description', 'price', 'product_type'])
     clarity = getlabels('./data/training/clarity_train.labels')
     conciseness = getlabels('./data/training/conciseness_train.labels')
     data['clarity'] = clarity
@@ -239,11 +244,11 @@ if __name__ == '__main__':
 
     # 创建进程进行多进程处理
     for i in range(workers):
-        data_list.append(data.sample(frac=(1/(workers-i))))
+        data_list.append(data.sample(frac=(1 / (workers - i))))
         data.drop(data_list[-1].index)
-        print('添加第'+str(i)+'个进程 : ' + str(datetime.datetime.now()))
+        print('添加第' + str(i) + '个进程 : ' + str(datetime.datetime.now()))
         pool.apply_async(parserdes, args=(q_info, q_error, data_list[i], alphabet, number, attrpattern, attrlist))
-        print('第'+str(i)+'个进程添加完毕 : ' + str(datetime.datetime.now()))
+        print('第' + str(i) + '个进程添加完毕 : ' + str(datetime.datetime.now()))
     pool.close()
 
     # 输出处理之后的结果
@@ -253,7 +258,6 @@ if __name__ == '__main__':
         print(q_info.get(True))
         if not q_error.empty():
             print(q_error.get(True))
-        if count % 100==0:
-            print(str(count//100)+'h')
-            
-            
+        if count % 100 == 0:
+            print(str(count // 100) + 'h')
+
